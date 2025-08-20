@@ -1,0 +1,57 @@
+sections:
+  - title: "New Account Summary"
+    include: true
+    description: "Overview of new REDCap user accounts submitted in the past week."
+    tables:
+      - type: summary_table
+        title: "New Account Requests Summary"
+        vars: ["new_account_num"]
+        include: false
+      - type: frequency_table
+        title: "Requester Institutions"
+        vars: ["requester_institution_1"]
+        include: false
+      - type: missingness_table
+        title: "Missingness Overview"
+        include: false
+    plots:
+      - type: bar
+        fig_label: "Fig 1: New REDCap User Accounts Requested per Day in the Past Week"
+        x: "request_date"
+        y: "new_account_num"
+        y_label: "Number of Accounts Requested"
+        date_range_days: 7
+        fill_colors: ["#2c7fb8"]
+        date_labels: "%b %d"
+        date_breaks: "1 day"
+        include: true
+
+      - type: grouped_bar
+        fig_label: "Fig 2: Requests by Support Type"
+        group_var: "cru_support_type_user"
+        x: "request_date"
+        date_range_months: 12
+        fill_colors: ["#2c7fb8", "#a6bddb"]
+        show_labels: true
+        text_size: 3.5
+        x_label: "Month"
+        y_label: "Number of Requests"
+        date_labels: "%b %Y"
+        date_breaks: "1 month"
+        include: true
+
+      - type: pie
+        fig_label: "Fig 3: Practice Project Accounts Distribution"
+        category_var: "practiceproject_account_yn"
+        date_range_months: 12
+        fill_colors: ["#2c7fb8", "#74a9cf", "#a6bddb", "#d0d1e6"]
+        legend_title_size: 10
+        legend_text_size: 9
+        include: true
+
+      - type: heatmap
+        fig_label: "Fig 4: Request Volume Heatmap"
+        x_label: "Day of Week"
+        y_label: "Month"
+        viridis_option: "C"
+        include: true

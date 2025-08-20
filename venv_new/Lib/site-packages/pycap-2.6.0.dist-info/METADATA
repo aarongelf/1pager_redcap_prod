@@ -1,0 +1,135 @@
+Metadata-Version: 2.1
+Name: pycap
+Version: 2.6.0
+Summary: PyCap: Python interface to REDCap
+Home-page: https://github.com/redcap-tools/PyCap
+License: MIT
+Author: Scott Burns
+Author-email: scott.s.burns@gmail.com
+Maintainer: Paul Wildenhain
+Maintainer-email: pwildenhain@gmail.com
+Requires-Python: >=3.8,<4.0
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: MacOS
+Classifier: Operating System :: Microsoft :: Windows
+Classifier: Operating System :: POSIX
+Classifier: Operating System :: Unix
+Classifier: Programming Language :: Python
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Topic :: Scientific/Engineering
+Classifier: Topic :: Software Development
+Provides-Extra: data-science
+Requires-Dist: pandas (>=1.3.4,<2.0.0) ; extra == "data-science"
+Requires-Dist: requests (>=2.20,<3.0)
+Requires-Dist: semantic-version (>=2.8.5,<3.0.0)
+Project-URL: Documentation, http://redcap-tools.github.io/PyCap/
+Project-URL: Repository, https://github.com/redcap-tools/PyCap
+Description-Content-Type: text/markdown
+
+# PyCap
+
+[![CI](https://github.com/redcap-tools/PyCap/actions/workflows/ci.yml/badge.svg)](https://github.com/redcap-tools/PyCap/actions/workflows/ci.yml)
+[![Codecov](https://codecov.io/gh/redcap-tools/PyCap/branch/master/graph/badge.svg?token=IRgcPzANxU)](https://codecov.io/gh/redcap-tools/PyCap)
+[![PyPI version](https://badge.fury.io/py/pycap.svg)](https://badge.fury.io/py/pycap)
+[![black](https://img.shields.io/badge/code%20style-black-black)](https://pypi.org/project/black/)
+
+## Intro
+
+`PyCap` is a python module exposing the REDCap API through some helpful abstractions. Information about the REDCap project can be found at https://project-redcap.org/.
+
+Available under the MIT license.
+
+## Installation
+
+Install the latest version with [`pip`](https://pypi.python.org/pypi/pip)
+
+```sh
+$ pip install PyCap
+```
+
+If you want to load REDCap data into [`pandas`](https://pandas.pydata.org/) dataframes, this will make sure you have `pandas` installed
+
+```sh
+$ pip install PyCap[all]
+```
+
+To install the bleeding edge version from the github repo, use the following
+
+```sh
+$ pip install -e git+https://github.com/redcap-tools/PyCap.git#egg=PyCap
+```
+
+## Documentation
+
+Canonical documentation and usage examples can be found [here](https://redcap-tools.github.io/PyCap/).
+
+## Features
+
+Currently, these API calls are available:
+
+### Export
+
+* Arms
+* Data Access Groups
+* Events
+* Field names
+* Instrument-event mapping
+* File
+* Logging
+* Metadata
+* Project Info
+* Records
+* Repeating instruments and events
+* Report
+* Survey participant list
+* Users
+* User-DAG assignment
+* User Roles
+* User-Role assignment
+* Version
+
+### Import
+
+* Arms
+* Data Access Groups
+* Events
+* File
+* Metadata
+* Records
+* Repeating instruments and events
+* Users
+* User-DAG assignment
+* User Roles
+* User-Role assignment
+
+### Delete
+
+* Arms
+* Data Access Groups
+* Events
+* File
+* Records
+* Users
+* User Roles
+
+### Other
+
+* Generate next record name
+* Switch data access group
+
+## Citing
+
+If you use PyCap in your research, please consider citing the software:
+
+>    Burns, S. S., Browne, A., Davis, G. N., Rimrodt, S. L., & Cutting, L. E. PyCap (Version 1.0) [Computer Software].
+>    Nashville, TN: Vanderbilt University and Philadelphia, PA: Childrens Hospital of Philadelphia.
+>    Available from https://github.com/redcap-tools/PyCap. doi:10.5281/zenodo.9917
+

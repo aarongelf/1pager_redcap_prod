@@ -1,0 +1,280 @@
+---
+format:
+  pdf:
+    latex-engine: xelatex
+    mainfont: "Arial" # Make sure you # this if running on Docker or Linux.  If running on Windoes or Mac, make sure this is on
+    #mainfont: "Liberation Sans" # Make sure you # this if running local.  If running on Docker or Linux, make sure this is on
+    fontsize: 12pt
+    colorlinks: true
+    linkcolor: black
+    geometry: margin=1in
+    output-dir: ../output
+  html:
+    embed-resources: true
+  docx: default
+params:
+  config_file: "../config/sample_config.yml" # Change to whatever yaml you will be using
+  data_file: "../data/pid_002_data.csv" # Change to whatever dataset you are using
+---
+\noindent {\large \textbf{Intake Report}} \hspace{1em} \normalsize reported `r Sys.Date()`
+
+
+```{r setup, include=FALSE}
+library(reticulate)
+use_virtualenv("../venv_new", required = TRUE) # Only for current local
+#use_python("/opt/venv/bin/python", required = TRUE) # Use for docker container creation
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  results = 'asis'
+)
+```
+
+```{r run-fetch-script, results='hide'}
+reticulate::source_python("../scripts/fetch_redcap_data.py")
+```
+
+```{r}
+library(showtext)
+if (.Platform$OS.type == "windows") {
+  # Windows font path (make sure the font exists here)
+  font_add("ReportFont", regular = "C:/Windows/Fonts/arial.ttf") 
+} else if (Sys.info()[["sysname"]] == "Darwin") {
+  # Mac font path (make sure the font actually lives here)
+  font_add("ReportFont", regular = "/System/Library/Fonts/Supplemental/Arial.ttf")
+} else {
+  # Linux / Docker
+  font_add("ReportFont", regular = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf")
+}
+
+showtext_auto()
+
+library(readr)
+library(yaml)
+library(janitor)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(lubridate)
+library(knitr)
+library(forcats)
+library(viridis)
+library(kableExtra)
+
+
+
+theme_set(
+  theme_minimal(base_family = "ReportFont") +
+    theme(
+      axis.text = element_text(color = "black"),
+      axis.title = element_text(color = "black"),
+      plot.title = element_text(face = "bold", color = "black")
+    )
+)
+
+config <- yaml::read_yaml(params$config_file)
+data <- read_csv(params$data_file) %>% clean_names()
+
+# ---- Helper functions for styling ----
+
+print_section_title <- function(title, new_page = FALSE) {
+  if (new_page) cat("\\newpage\n\n")
+  cat("\\bigskip\n")
+  cat("\\textbf{", title, "}", "\n\n", sep = "")
+}
+
+print_plot <- function(plot_obj, fig_label = NULL) {
+  if (!is.null(fig_label)) {
+    cat("\\begin{center}\n\\textbf{", fig_label, "}\n\\end{center}\n\n", sep = "")
+  }
+  print(plot_obj)
+  cat("\n\\bigskip\n")
+}
+
+print_table <- function(tbl) {
+  cat("\\begin{center}\n")
+  print(tbl)
+  cat("\\end{center}\n\\bigskip\n")
+}
+
+# ---- TABLE FUNCTIONS ----
+table_summary <- function(cfg, df) {
+  vars_present <- intersect(cfg$vars, names(df))
+  if (length(vars_present) == 0) return(kable(tibble(), caption=cfg$title, booktabs=TRUE))
+  tbl <- df %>% select(all_of(vars_present))
+  kable(tbl, caption=cfg$title, booktabs=TRUE) %>% kable_styling(latex_options="hold_position")
+}
+
+table_frequency <- function(cfg, df) {
+  vars_present <- intersect(cfg$vars, names(df))
+  if (length(vars_present) == 0) return(kable(tibble(), caption=cfg$title, booktabs=TRUE))
+  tbl <- df %>% count(across(all_of(vars_present))) %>% arrange(desc(n))
+  kable(tbl, caption=cfg$title, booktabs=TRUE) %>% kable_styling(latex_options="hold_position")
+}
+
+table_missingness <- function(cfg, df) {
+  if (nrow(df) == 0) return(kable(tibble(), caption=cfg$title, booktabs=TRUE))
+  tbl <- df %>% summarise(across(everything(), ~mean(is.na(.))*100)) %>%
+    pivot_longer(cols=everything(), names_to='Variable', values_to='Missing (%)') %>%
+    arrange(desc(`Missing (%)`))
+  kable(tbl, caption=cfg$title, booktabs=TRUE) %>% kable_styling(latex_options="hold_position")
+}
+
+# ---- UofC Colour Scheme ----
+
+uofc_colors <- list(
+  red = "#d6001c",
+  gold = "#ffcd00",
+  light_orange = "#ffa300",
+  dark_orange = "#ff671f",
+  rubine_red = "#ed0a72",
+  berry = "#9c0534",
+  teal = "#47a67c",
+  light_yellow = "#ffe57b",
+  brown = "#6c3302",
+  taupe = "#d3ac8b",
+  black = "#000000",
+  dark_grey = "#6d6e71",
+  light_grey = "#c7c8ca"
+)
+
+# ---- PLOT FUNCTIONS ----
+
+apply_date_filter <- function(df, cfg, date_col = "request_date") {
+  if (!is.null(cfg$date_range_days)) {
+    df <- df %>%
+      filter(!!sym(date_col) >= Sys.Date() - lubridate::days(cfg$date_range_days))
+  } else if (!is.null(cfg$date_range_months)) {
+    df <- df %>%
+      filter(!!sym(date_col) >= Sys.Date() %m-% months(cfg$date_range_months))
+  }
+  return(df)
+}
+
+plot_bar <- function(cfg, df) {
+  if (!(cfg$x %in% names(df))) return(ggplot() + labs(title = cfg$title))
+  
+  df <- df %>% mutate(request_date = as.Date(!!sym(cfg$x)))
+  if (!is.null(cfg$date_range_days)) df <- df %>% filter(request_date >= Sys.Date() - days(cfg$date_range_days))
+  
+  p_data <- if (is.null(cfg$y) || !(cfg$y %in% names(df))) {
+    df %>% count(request_date) %>% rename(y_val = n)
+  } else {
+    df %>% group_by(request_date) %>% summarise(y_val = sum(as.numeric(!!sym(cfg$y)), na.rm=TRUE), .groups='drop')
+  }
+  
+  if (nrow(p_data) == 0) p_data <- tibble(request_date = Sys.Date(), y_val = 0)
+  
+  ggplot(p_data, aes(x=request_date, y=y_val)) +
+    geom_col(fill = uofc_colors$gold) +
+    scale_x_date(date_labels='%b %d', date_breaks='1 day') +
+    labs(title=cfg$title, x='Date', y=ifelse(is.null(cfg$y), 'Count', cfg$y)) +
+    theme_minimal(base_family='ReportFont', base_size=11) +
+    theme(axis.text.x=element_text(angle=45, hjust=1), plot.title=element_text(face='bold'))
+}
+
+plot_grouped_bar <- function(cfg, df) {
+  if (!(cfg$group_var %in% names(df))) return(ggplot() + labs(title=cfg$title))
+  
+  df <- df %>% mutate(request_date=as.Date(request_date),
+                      month=floor_date(request_date,'month'),
+                      !!sym(cfg$group_var) := factor(!!sym(cfg$group_var)))
+  
+  if (!is.null(cfg$date_range_months)) df <- df %>% filter(request_date >= Sys.Date() %m-% months(cfg$date_range_months))
+  
+  p_data <- df %>% group_by(month, !!sym(cfg$group_var)) %>% summarise(requests=n(), .groups='drop')
+  months_seq <- seq.Date(from=floor_date(Sys.Date() %m-% months(cfg$date_range_months-1),'month'), to=floor_date(Sys.Date(),'month'),'month')
+  p_data <- p_data %>% complete(month=months_seq, !!sym(cfg$group_var), fill=list(requests=0))
+  
+  if (nrow(p_data) == 0) p_data <- tibble(month=Sys.Date(), !!sym(cfg$group_var) := factor('None'), requests=0)
+
+  group_colors <- c(uofc_colors$red, uofc_colors$gold, uofc_colors$light_orange)
+  n_groups <- length(unique(p_data[[cfg$group_var]]))
+  group_colors <- rep(group_colors, length.out = n_groups)
+  
+  ggplot(p_data, aes(x=month, y=requests, fill=!!sym(cfg$group_var))) +
+    geom_col(position=position_dodge(width=20)) +
+    geom_text(aes(label=requests), position=position_dodge(width=20), vjust=-0.5, size=3.5) +
+    scale_x_date(date_labels='%b %Y', date_breaks='1 month') +
+    scale_fill_manual(values = group_colors) +
+    labs(title=cfg$title, x='Month', y='Number of Requests', fill=cfg$group_var) +
+    theme_minimal(base_family='ReportFont', base_size=11) +
+    theme(axis.text.x=element_text(angle=45, hjust=1), plot.title=element_text(face='bold'))
+}
+
+plot_pie <- function(cfg, df) {
+  if (!(cfg$category_var %in% names(df))) return(ggplot() + labs(title=cfg$title))
+  
+  df <- df %>% mutate(request_date=as.Date(request_date), !!sym(cfg$category_var) := factor(!!sym(cfg$category_var)))
+  if (!is.null(cfg$date_range_months)) df <- df %>% filter(request_date >= Sys.Date() %m-% months(cfg$date_range_months))
+  
+  p_data <- df %>% count(!!sym(cfg$category_var))
+  if (nrow(p_data) == 0) p_data <- tibble(!!sym(cfg$category_var) := factor('None'), n=0)
+  p_data <- p_data %>% mutate(percentage = round(100*n/sum(n),1),
+                              label = paste0(!!sym(cfg$category_var),' (',percentage,'%)'))
+  
+  cat_colors <- c(uofc_colors$red, uofc_colors$gold, uofc_colors$light_orange, uofc_colors$dark_orange, uofc_colors$rubine_red)
+  n_cats <- length(unique(p_data[[cfg$category_var]]))
+  cat_colors <- rep(cat_colors, length.out = n_cats)
+  
+  ggplot(p_data, aes(x='', y=n, fill=!!sym(cfg$category_var))) +
+    geom_col(width=1, color='white') + 
+    coord_polar(theta='y') +
+    scale_fill_manual(values = cat_colors) +
+    theme_void(base_family='ReportFont') +
+    labs(fill=cfg$category_var)
+}
+
+plot_heatmap <- function(cfg, df) {
+  if (!('request_date' %in% names(df))) return(ggplot() + labs(title=cfg$title))
+  
+  df <- df %>% mutate(request_date=as.Date(request_date),
+                      weekday=wday(request_date,label=TRUE),
+                      month=month(request_date,label=TRUE))
+  p_data <- df %>% count(month, weekday)
+  if (nrow(p_data) == 0) p_data <- tibble(month=factor('Jan'), weekday=factor('Mon'), n=0)
+  
+  ggplot(p_data, aes(x=weekday, y=month, fill=n)) +
+    geom_tile(color='white') +
+    scale_fill_gradient(low = uofc_colors$light_grey, high = uofc_colors$red) +
+    labs(title=cfg$title, x='Day of Week', y='Month') +
+    theme_minimal(base_family='ReportFont') +
+    theme(axis.text.x=element_text(angle=45, hjust=1), plot.title=element_text(face='bold'))
+}
+
+```
+
+```{r generate-report, echo=FALSE}
+# Loop through sections in config
+for (section in config$sections) {
+  if (!isTRUE(section$include)) next
+
+  new_page_flag <- ifelse(!is.null(section$new_page), section$new_page, FALSE)
+  print_section_title(section$title, new_page = new_page_flag)
+  
+  # Render tables
+  if (!is.null(section$tables)) {
+    for (t in section$tables) {
+      if (!is.null(t$include) && !t$include) next
+      if (t$type == "summary_table") table_summary(t, data)
+      if (t$type == "frequency_table") table_frequency(t, data)
+      if (t$type == "missingness_table") table_missingness(t, data)
+    }
+  }
+  
+  # Render plots
+  if (!is.null(section$plots)) {
+    for (p in section$plots) {
+      if (!is.null(p$include) && !p$include) next
+      
+      if (p$type == "bar") print_plot(plot_bar(p, data), fig_label = p$fig_label)
+      if (p$type == "grouped_bar") print_plot(plot_grouped_bar(p, data), fig_label = p$fig_label)
+      if (p$type == "pie") print_plot(plot_pie(p, data), fig_label = p$fig_label)
+      if (p$type == "heatmap") print_plot(plot_heatmap(p, data), fig_label = p$fig_label)
+    }
+  }
+}
+
+file.rename("1pager_template.pdf", "../output/1pager_template.pdf")
+```
